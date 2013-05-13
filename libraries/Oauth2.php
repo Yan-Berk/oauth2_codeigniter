@@ -45,8 +45,8 @@ class Oauth2 {
 			);
 	
 	private $api_urls = array (
-				'facebook' => 'https://graph.facebook.com/me?access_token=',
-				'linkedin' => 'https://api.linkedin.com/v1/people/~?oauth2_access_token='
+				'facebook' => 'https://graph.facebook.com/me?',
+				'linkedin' => 'https://api.linkedin.com/v1/people/~?'
 			);
 	
 	public $ci;   
@@ -203,12 +203,12 @@ class Oauth2 {
 	 */
 	public function api_call() {
 		if ($this->get_site() == 'linkedin') {
-			$request_url = $this->api_urls[$this->get_site()].$this->get_access_token();
+			$request_url = $this->api_urls[$this->get_site()].'oauth2_access_token='.$this->get_access_token();
 			$results_xml = $this->ci->curl->simple_get($request_url);
 			return new SimpleXMLElement($results_xml);			
 		}
 		else if ($this->get_site() == 'facebook') {
-			return json_decode($this->ci->curl->simple_get($this->api_urls[$this->get_site()].$this->get_access_token()));
+			return json_decode($this->ci->curl->simple_get($this->api_urls[$this->get_site()].'access_token='.$this->get_access_token()));
 		}
 
 	}
