@@ -33,7 +33,24 @@ class Oauth2 {
 	private $state;
 	private $access_token;
 	private $access_token_expires_in; 
-	public $ci;
+	
+	private $initial_urls = array (
+				'facebook' => 'https://www.facebook.com/dialog/oauth/?',
+				'linkedin' => 'https://www.linkedin.com/uas/oauth2/authorization?'
+			);
+	
+	private $response_urls = array (
+				'facebook' => 'https://graph.facebook.com/oauth/access_token?',
+				'linkedin' => 'https://www.linkedin.com/uas/oauth2/accessToken?'
+			);
+	
+	private $api_urls = array (
+				'facebook' => 'https://graph.facebook.com/me?access_token=',
+				'linkedin' => 'https://api.linkedin.com/v1/people/~?oauth2_access_token='
+			);
+	
+	public $ci;   
+	
 	
 	public function __construct($input) {
 		$this->ci = get_instance();
@@ -67,12 +84,7 @@ class Oauth2 {
 	 * Build the first part of the initial URL.
 	 */
 	public function get_request_url() {
-		if ($this->get_site() == 'linkedin') {
-			return 'https://www.linkedin.com/uas/oauth2/authorization?';
-		}
-		else if ($this->get_site() == 'facebook') {
-			return 'https://www.facebook.com/dialog/oauth/?';
-		}
+		return $this->initial_urls[$this->get_site()];
 	}
 	
 	/**
@@ -133,12 +145,7 @@ class Oauth2 {
 	 * Build the first part of the response URL.
 	 */	
 	public function get_access_token_url() {
-		if ($this->get_site() == 'linkedin') {
-			return 'https://www.linkedin.com/uas/oauth2/accessToken?';
-		}		
-		else if ($this->get_site() == 'facebook') {
-			return 'https://graph.facebook.com/oauth/access_token?';
-		}
+		return $this->response_urls[$this->get_site()];
 	}
 	
 	/**
@@ -196,13 +203,12 @@ class Oauth2 {
 	 */
 	public function api_call() {
 		if ($this->get_site() == 'linkedin') {
-			$request_url = 'https://api.linkedin.com/v1/people/~?oauth2_access_token='.$this->get_access_token();
+			$request_url = $this->api_urls[$this->get_site()].$this->get_access_token();
 			$results_xml = $this->ci->curl->simple_get($request_url);
 			return new SimpleXMLElement($results_xml);			
 		}
 		else if ($this->get_site() == 'facebook') {
-			var_dump($this->ci->session->all_userdata());
-			return json_decode($this->ci->curl->simple_get('https://graph.facebook.com/me?access_token='. $this->get_access_token()));
+			return json_decode($this->ci->curl->simple_get($this->api_urls[$this->get_site()].$this->get_access_token()));
 		}
 
 	}
