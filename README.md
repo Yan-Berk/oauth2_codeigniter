@@ -1,7 +1,7 @@
 OAUTH 2 for Codeigniter:
 --------------
 
-A Codeigniter library which allows users to authorize your Linkedin or Facebook application using OAuth2.
+A Codeigniter library which allows users to authorize your Linkedin, Facebook or Google applications using OAuth2.
 
 
 Usage example:
@@ -25,24 +25,28 @@ Usage example:
 	
 		function after_connect() {
 			$this->load->library('oauth2', $this->api_basic_info );
-			
 			if (!$this->session->userdata($this->api_basic_info['site'].'_oauth2_access_token')) {
 				if ($this->oauth2->retrieve_access_token()) {
-					var_dump($this->oauth2->api_call());
+					
 				}
 			}
-			else {
-				var_dump($this->oauth2->api_call());
-			}
+			var_dump($this->oauth2->api_call());
 		}
 	}
 	
 Requirements:
 --------------
 
-- cURL spark. 
+- libcurl. 
 	
 	
+	
+Version 1.1 - May 17 2013
+--------------
+
+- Added Google authorization.
+- Removed the need for the cURL spark. 
+
 Version 1.0 - May 11 2013
 --------------
 
