@@ -1,6 +1,7 @@
 <?php if ( ! defined('BASEPATH')) exit('No direct script access allowed');
 
 class Test extends CI_Controller {
+
 	private $api_basic_info = array (
 			'site' => 'facebook',
 			'app_key' => 'APP KEY',
@@ -15,14 +16,16 @@ class Test extends CI_Controller {
 
 	function connect() {
 		$this->load->library('oauth2', $this->api_basic_info);
-		$connect_url = $this->oauth2->build_request_url();
+		$connect_url = $this->oauth2->build_initial_request_url();
 		echo '<a href="'.$connect_url.'">connect</a>';
 	}
 
 	function after_connect() {
 		$this->load->library('oauth2', $this->api_basic_info );
 		if (!$this->session->userdata($this->api_basic_info['site'].'_oauth2_access_token')) {
-			$this->oauth2->retrieve_access_token();
+			if ($this->oauth2->retrieve_access_token_and_save_in_session()) {
+				
+			}
 		}
 		var_dump($this->oauth2->api_call());
 	}
