@@ -1,7 +1,7 @@
 OAUTH 2 for Codeigniter:
 --------------
 
-A Codeigniter library which allows users to authorize your Linkedin, Facebook or Google applications using OAuth2.
+A Codeigniter library which allows users to authorize your Linkedin, Facebook, Google or Instagram applications using OAuth2.
 
 
 Usage example:
