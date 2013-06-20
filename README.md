@@ -38,6 +38,10 @@ Requirements:
 - libcurl. 
 	
 	
+Version 1.2 - June 20 2013
+--------------
+
+- Added Instagram authorization.
 	
 Version 1.1 - May 17 2013
 --------------
