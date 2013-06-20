@@ -23,6 +23,8 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 */
 
+define ('NO_EXPIRE_VALUE', 0);
+
 class Oauth2 {
 
 	private $site;
@@ -34,34 +36,44 @@ class Oauth2 {
 	private $access_token;
 	private $access_token_expires_in; 
 	
+	private $extra_param_sites = array('linkedin', 'google', 'instagram');
+	
 	private $initial_urls = array (
-				'facebook'	=> 'https://www.facebook.com/dialog/oauth/?',
-				'linkedin'	=> 'https://www.linkedin.com/uas/oauth2/authorization?',
-				'google'	=> 'https://accounts.google.com/o/oauth2/auth?'
-			);
-	
+			'facebook'	=>	'https://www.facebook.com/dialog/oauth/?',
+			'linkedin'	=>	'https://www.linkedin.com/uas/oauth2/authorization?',
+			'google'	=>	'https://accounts.google.com/o/oauth2/auth?',
+			'instagram'	=>	'https://api.instagram.com/oauth/authorize/?'
+	);
+
 	private $response_urls = array (
-				'facebook'	=> 'https://graph.facebook.com/oauth/access_token?',
-				'linkedin'	=> 'https://www.linkedin.com/uas/oauth2/accessToken?',
-				'google'	=> 'https://accounts.google.com/o/oauth2/token?'
-			);
-	
+			'facebook'	=>	'https://graph.facebook.com/oauth/access_token?',
+			'linkedin'	=>	'https://www.linkedin.com/uas/oauth2/accessToken?',
+			'google'	=>	'https://accounts.google.com/o/oauth2/token?',
+			'instagram'	=>	'https://api.instagram.com/oauth/access_token?'
+	);
+
 	private $api_urls = array (
-				'facebook'	=> 'https://graph.facebook.com/me?access_token=',
-				'linkedin'	=> 'https://api.linkedin.com/v1/people/~?oauth2_access_token=',
-				'google'	=> 'https://www.googleapis.com/oauth2/v1/userinfo?access_token='
-			);
-	
+			'facebook'	=>	'https://graph.facebook.com/me?access_token=',
+			'linkedin'	=>	'https://api.linkedin.com/v1/people/~?oauth2_access_token=',
+			'google'	=>	'https://www.googleapis.com/oauth2/v1/userinfo?access_token=',
+			'instagram'	=>	'https://api.instagram.com/v1/users/self/feed?access_token='
+	);
+
 	public $ci;
 	
-	
 	public function __construct($input) {
-		$this->ci = get_instance();
+		$this->ci = get_instance();		
+		$this->load_framework_basics();
+		$this->set_oauth2_class_params($input);	
+	}
+	
+	private function load_framework_basics() {
 		$this->ci->load->database();
 		$this->ci->load->helper('url');
 		$this->ci->load->library('session');		
-		
-		
+	}
+
+	private function set_oauth2_class_params($input) {
 		$this->set_site($input['site']);
 		$this->set_consumer_key($input['app_key']);
 		$this->set_consumer_secret($input['app_secret']);
@@ -72,177 +84,227 @@ class Oauth2 {
 		$this->set_access_token($this->ci->session->userdata($this->get_site().'_oauth2_access_token'));
 		$this->set_access_token_expires_in($this->ci->session->userdata($this->get_site().'_oauth2_access_token_expires_in'));		
 	}
-
-	/**
-	 * Build the initial request URL.
-	 */
-	public function build_request_url() {
-		$request_url = $this->get_request_url();
+	
+	public function build_initial_request_url() {
+		$request_url = $this->get_request_base_url();
 		$request_url .= $this->get_request_parameters();
 		return $request_url;			
 	}
 	
-	/**
-	 * Build the first part of the initial URL.
-	 */
-	public function get_request_url() {
+	private function get_request_base_url() {
 		return $this->initial_urls[$this->get_site()];
 	}
 	
-	/**
-	 * Get the required parameters for the initial URL.
-	 */
-	public function get_request_parameters() {
-		$state = substr(md5(rand()), 0, 8);
-		$this->ci->session->set_userdata($this->get_site().'_oauth2_state', $state);
-	
-		$query_params = array (
-					'client_id' => $this->get_consumer_key(),
-					'scope' => $this->get_scope(),
-					'state' => $state,
-					'redirect_uri' => $this->get_redirect_url()
-		);
+	private function get_request_parameters() {
+		$this->create_new_state_and_save_in_session();
 		
-		if ($this->get_site() == 'linkedin' || $this->get_site() == 'google') {
+		$query_params = $this->get_query_params('request');
+		
+		if (in_array($this->get_site(), $this->extra_param_sites)) {
 			$query_params['response_type'] = 'code';
 		}
 		
 		return http_build_query($query_params); 
 	}	
 	
-	/**
-	 * Check whether the response is valid, build the response URL and save the access token to session.
-	 */
-	public function retrieve_access_token() {
-		if ($this->ci->input->get('state') != $this->ci->session->userdata($this->get_site().'_oauth2_state')) {
+	private function create_new_state_and_save_in_session() {
+		$state = substr(md5(rand()), 0, 8);
+		$this->ci->session->set_userdata($this->get_site().'_oauth2_state', $state);
+		$this->set_state($state);
+	}
+	
+	private function get_query_params($type) {
+
+		$query_params = array('client_id' => $this->get_consumer_key(),
+								'redirect_uri' => $this->get_redirect_url()
+						);
+		
+		if ($type == 'request') {
+			$query_params = array_merge($query_params, $this->get_request_query_params());
+		}
+		else if ($type == 'access_token') {
+			$query_params = array_merge($query_params, $this->get_access_token_query_params());
+		}	
+		
+		return $query_params;
+	}
+	
+	private function get_request_query_params() {
+		return array ('scope' => $this->get_scope(),
+						'state' => $this->get_state()
+				);
+	}
+	
+	private function get_access_token_query_params() {
+		return array('code' => $this->ci->input->get('code'),
+						'client_secret' => $this->get_consumer_secret()
+				);	
+	}
+	
+	public function retrieve_access_token_and_save_in_session() {
+		if (!$this->is_response_valid()) {
 			return false;
 		}
 		
-		if ($this->ci->input->get('error')) {
-			
+		return $this->get_access_token_and_save_in_session();
+	}
+
+	
+	private function is_response_valid() {
+		if ($this->ci->input->get('state') != $this->get_state()) {
+			return false;
+		}
+		if ($this->ci->input->get('error')) {			
 			//Handle error
 			$this->ci->input->get('error_description');
+			return true;
 		}
 		
 		if (!$this->ci->input->get('code')) {
 			return false;
-		}
+		}		
 		
-		$request_url = $this->build_retrieve_access_token_url();
-		
-		return $this->save_access_token_data($request_url);
+		return true;
 	}
-
-	/**
-	 * Build the response URL
-	 */
-	public function build_retrieve_access_token_url() {
-		$request_url = $this->get_access_token_url();
+	
+	private function build_access_token_retrieve_url() {
+		$request_url = $this->get_access_token_base_url();
 		$request_url .= $this->get_access_token_parameters();
 		return $request_url;			
 	}
 	
-	
-	/**
-	 * Build the first part of the response URL.
-	 */	
-	public function get_access_token_url() {
+	private function get_access_token_base_url() {
 		return $this->response_urls[$this->get_site()];
 	}
-	
-	/**
-	 * Get the parameters of the response URL 
-	 */
-	public function get_access_token_parameters() {
 
-		$query_params = array (
-							'code' => $this->ci->input->get('code'),
-							'redirect_uri' => $this->get_redirect_url(),
-							'client_id' => $this->get_consumer_key(),
-							'client_secret' => $this->get_consumer_secret()
-						);	
-		if ($this->get_site() == 'linkedin' || $this->get_site() == 'google') {
+	private function get_access_token_parameters() {
+		$query_params = $this->get_query_params('access_token');
+
+		if (in_array($this->get_site(), $this->extra_param_sites)) {
 			$query_params['grant_type'] = 'authorization_code';
 		}
+
 		return http_build_query($query_params);
 	}
 	
-	/**
-	 * Save the received access token and the time it expires on to session
-	 * @param string $request_url
-	 */
-	public function save_access_token_data($request_url) {
+	private function get_access_token_and_save_in_session() {
 		
 		if ($this->get_site() == 'linkedin') {
-			$result = json_decode(file_get_contents($this->get_access_token_url().$this->get_access_token_parameters()));
-			if (!isset($result->access_token)) {
-				return false;
-			}
-			$this->set_access_token($result->access_token);
-			$this->set_access_token_expires_in($result->expires_in);
+			$this->get_linkedin_token_and_save_in_session();
 		}
 		else if ($this->get_site() == 'facebook') {
-			$result = file_get_contents($this->get_access_token_url().$this->get_access_token_parameters());
-			$params = null;
-			parse_str($result, $params);
-			if (array_key_exists('access_token', $params)) {
-				$this->set_access_token($params['access_token']);
-				$this->set_access_token_expires_in($params['expires']);
-			}
-			else {
-				return false;
-			}
+			$this->get_facebook_token_and_save_in_session();
 		}
 		else if ($this->get_site() == 'google') {
-			$result = json_decode($this->run_curl($this->get_access_token_url(), 'POST', $this->get_access_token_parameters()));
-			if (!isset($result->access_token)) {
-				return false;
-			}
-			$this->set_access_token($result->access_token);
-			$this->set_access_token_expires_in($result->expires_in);
+			$this->get_google_token_and_save_in_session();
+		}
+		else if ($this->get_site() == 'instagram') {
+			$this->get_instagram_token_and_save_in_session();
 		}
 		
-		$this->ci->session->set_userdata($this->get_site().'_oauth2_access_token', $this->get_access_token());
-		$this->ci->session->set_userdata($this->get_site().'_oauth2_access_token_expires_in', $this->get_access_token_expires_in());	
+		$this->save_access_token_in_session();
 		return true;
 	}
+	
+	private function get_linkedin_token_and_save_in_session() {
+		$result = json_decode($this->get_access_token_by_get_request());
+		if ($result->access_token) {
+			$this->set_access_token_data($result->access_token, $result->expires_in);
+			return true;
+		}
+		return false;	
+	}
+	
+	private function get_facebook_token_and_save_in_session() {
+		$result = json_decode($this->get_access_token_by_get_request());		
+		$params = null;
+		parse_str($result, $params);
+		if (array_key_exists('access_token', $params)) {
+			$this->set_access_token_data($params['access_token'], $params['expires']);			
+			return true;
+		}
+		return false;
+	}
+	
+	private function get_google_token_and_save_in_session() {
+		$result = json_decode($this->get_access_token_by_post_request());
+		if ($result->access_token) {
+			$this->set_access_token_data($result->access_token, $result->expires_in);
+			return true;
+		}
+		return false;	
+	}
+	
+	private function get_instagram_token_and_save_in_session() {
+		$result = json_decode($this->get_access_token_by_post_request());
+		if ($result->access_token) {
+			$this->set_access_token_data($result->access_token, NO_EXPIRE_VALUE);
+			return true;
+		}
+		return false;		
+	}
+	
+	private function save_access_token_in_session() {
+		$this->ci->session->set_userdata($this->get_site().'_oauth2_access_token', $this->get_access_token());
+		$this->ci->session->set_userdata($this->get_site().'_oauth2_access_token_expires_in', $this->get_access_token_expires_in());
+	}
+	
+	private function get_access_token_by_get_request() {
+		return file_get_contents($this->build_access_token_retrieve_url());
+	}
+	
+	private function get_access_token_by_post_request() {
+		return $this->run_curl($this->get_access_token_base_url(), 'POST', $this->get_access_token_parameters());
+	}	
+	
+	
+	private function set_access_token_data($access_token, $expires_in) {
+		$this->set_access_token($access_token);
+		$this->set_access_token_expires_in($expires_in);
+	}
+		
+	public function run_curl($url, $type, $params) {
+		$ch = curl_init();
+		curl_setopt($ch, CURLOPT_URL, $url);
+		if ($type == 'POST') {
+			curl_setopt($ch, CURLOPT_POST, 1);
+		}
+		curl_setopt($ch, CURLOPT_POSTFIELDS, $params);
+		curl_setopt($ch, CURLOPT_HEADER, 0);
+		curl_setopt($ch, CURLOPT_RETURNTRANSFER  ,1);
+		$result = curl_exec($ch);
+		curl_close($ch);
+	
+		return $result;
+	}	
+	
 	
 	/**
 	 * Run a basic API call to test that the process was successful.
 	 */
 	public function api_call() {
 		if ($this->get_site() == 'linkedin') {
-			$results_xml = file_get_contents($this->api_urls[$this->get_site()].$this->get_access_token());
-			return new SimpleXMLElement($results_xml);			
+			return $this->get_xml_api_call();
 		}
 		else if ($this->get_site() == 'facebook') {
-			return json_decode(file_get_contents($this->api_urls[$this->get_site()].$this->get_access_token()));
+			return $this->get_json_api_call();
 		}
 		else if ($this->get_site() == 'google') {	
-			return json_decode(file_get_contents($this->api_urls[$this->get_site()].$this->get_access_token()));	
+			return $this->get_json_api_call();
 		}
-	}
-	/**
-	 * Runs the cURL
-	 * @param string $url
-	 * @param string $type
-	 * @param array $params
-	 */
-	public function run_curl($url, $type, $params) {
-		$ch = curl_init();
-		curl_setopt($ch, CURLOPT_URL, $url);
-		if ($type == 'POST') {
-			curl_setopt($ch, CURLOPT_POST, 1);			
+		else if($this->get_site() == 'instagram') {
+			return $this->get_json_api_call();
 		}
-		curl_setopt($ch, CURLOPT_POSTFIELDS, $params);
-		curl_setopt($ch, CURLOPT_HEADER, 0);
-		curl_setopt($ch, CURLOPT_RETURNTRANSFER  ,1);
-		$result = curl_exec($ch);
-		curl_close($ch);		
-		
-		return $result;
 	}
 	
+	private function get_xml_api_call() {
+		$results_xml = file_get_contents($this->api_urls[$this->get_site()].$this->get_access_token());
+		return new SimpleXMLElement($results_xml);		
+	}
+	
+	private function get_json_api_call() {
+		return json_decode(file_get_contents($this->api_urls[$this->get_site()].$this->get_access_token()));
+	}
 	/**
 	 * Normalizes the URL. Turns a relative URL into an absolute one.
 	 * @param string $url
