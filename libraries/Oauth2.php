@@ -36,27 +36,30 @@ class Oauth2 {
 	private $access_token;
 	private $access_token_expires_in;
 
-	private $extra_param_sites = array('linkedin', 'google', 'instagram');
+	private $extra_param_sites = array('linkedin', 'google', 'instagram', 'foursquare');
 
 	private $initial_urls = array (
 			'facebook'	=>	'https://www.facebook.com/dialog/oauth/?',
 			'linkedin'	=>	'https://www.linkedin.com/uas/oauth2/authorization?',
 			'google'	=>	'https://accounts.google.com/o/oauth2/auth?',
-			'instagram'	=>	'https://api.instagram.com/oauth/authorize/?'
+			'instagram'	=>	'https://api.instagram.com/oauth/authorize/?',
+			'foursquare'	=>	'https://foursquare.com/oauth2/authenticate?'
 	);
 
 	private $response_urls = array (
 			'facebook'	=>	'https://graph.facebook.com/oauth/access_token?',
 			'linkedin'	=>	'https://www.linkedin.com/uas/oauth2/accessToken?',
 			'google'	=>	'https://accounts.google.com/o/oauth2/token?',
-			'instagram'	=>	'https://api.instagram.com/oauth/access_token?'
+			'instagram'	=>	'https://api.instagram.com/oauth/access_token?',
+			'foursquare'	=>	'https://foursquare.com/oauth2/access_token?'
 	);
 
 	private $api_urls = array (
 			'facebook'	=>	'https://graph.facebook.com/me?access_token=',
 			'linkedin'	=>	'https://api.linkedin.com/v1/people/~?oauth2_access_token=',
 			'google'	=>	'https://www.googleapis.com/oauth2/v1/userinfo?access_token=',
-			'instagram'	=>	'https://api.instagram.com/v1/users/self/feed?access_token='
+			'instagram'	=>	'https://api.instagram.com/v1/users/self/feed?access_token=',
+			'foursquare'	=>	'https://api.foursquare.com/v2/users/self/checkins?v=YYYYMMDD&oauth_token='
 	);
 
 	public $ci;
@@ -149,7 +152,6 @@ class Oauth2 {
 		return $this->get_access_token_and_save_in_session();
 	}
 
-
 	private function is_response_valid() {
 		if ($this->ci->input->get('state') != $this->get_state()) {
 			return false;
@@ -201,6 +203,9 @@ class Oauth2 {
 		else if ($this->get_site() == 'instagram') {
 			$this->get_instagram_token();
 		}
+		else if ($this->get_site() == 'foursquare') {
+			$this->get_foursquare_token();
+		}
 
 		$this->save_access_token_in_session();
 		return true;
@@ -243,6 +248,16 @@ class Oauth2 {
 		}
 		return false;
 	}
+	
+	private function get_foursquare_token() {
+		$result = json_decode($this->get_access_token_by_get_request());
+		
+		if ($result->access_token) {
+			$this->set_access_token_data($result->access_token, NO_EXPIRE_VALUE);
+			return true;
+		}
+		return false;
+	}
 
 	private function save_access_token_in_session() {
 		$this->ci->session->set_userdata($this->get_site().'_oauth2_access_token', $this->get_access_token());
@@ -256,7 +271,6 @@ class Oauth2 {
 	private function get_access_token_by_post_request() {
 		return $this->run_curl($this->get_access_token_base_url(), 'POST', $this->get_access_token_parameters());
 	}
-
 
 	private function set_access_token_data($access_token, $expires_in) {
 		$this->set_access_token($access_token);
@@ -278,11 +292,12 @@ class Oauth2 {
 		return $result;
 	}
 
-
 	/**
 	 * Run a basic API call to test that the process was successful.
 	 */
 	public function api_call() {
+
+		$this->prepare_api_url();
 
 		$xml_sites = array('linkedin');
 
@@ -290,13 +305,19 @@ class Oauth2 {
 			return $this->get_xml_api_call();
 		}
 
-		$json_sites = array('facebook', 'google', 'instagram');
+		$json_sites = array('facebook', 'google', 'instagram', 'foursquare');
 
 		if (in_array($this->get_site(), $json_sites)) {
 			return $this->get_json_api_call();
 		}
 	}
 
+	private function prepare_api_url() {
+		if ($this->get_site() == 'foursquare') {
+			$this->api_urls[$this->get_site()] = str_replace('v=YYYYMMDD', 'v='.date('Ymd'), $this->api_urls[$this->get_site()]);
+		}
+	}
+	
 	private function get_xml_api_call() {
 		$results_xml = file_get_contents($this->api_urls[$this->get_site()].$this->get_access_token());
 		return new SimpleXMLElement($results_xml);
@@ -305,6 +326,7 @@ class Oauth2 {
 	private function get_json_api_call() {
 		return json_decode(file_get_contents($this->api_urls[$this->get_site()].$this->get_access_token()));
 	}
+	
 	/**
 	 * Normalizes the URL. Turns a relative URL into an absolute one.
 	 * @param string $url
