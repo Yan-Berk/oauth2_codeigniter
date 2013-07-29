@@ -191,21 +191,8 @@ class Oauth2 {
 
 	private function get_access_token_and_save_in_session() {
 
-		if ($this->get_site() == 'linkedin') {
-			$this->get_linkedin_token();
-		}
-		else if ($this->get_site() == 'facebook') {
-			$this->get_facebook_token();
-		}
-		else if ($this->get_site() == 'google') {
-			$this->get_google_token();
-		}
-		else if ($this->get_site() == 'instagram') {
-			$this->get_instagram_token();
-		}
-		else if ($this->get_site() == 'foursquare') {
-			$this->get_foursquare_token();
-		}
+		$method_name = 'get_'.$this->get_site().'_token';
+		$this->$method_name();
 
 		$this->save_access_token_in_session();
 		return true;
