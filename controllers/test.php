@@ -23,9 +23,7 @@ class Test extends CI_Controller {
 	function after_connect() {
 		$this->load->library('oauth2', $this->api_basic_info );
 		if (!$this->session->userdata($this->api_basic_info['site'].'_oauth2_access_token')) {
-			if ($this->oauth2->retrieve_access_token_and_save_in_session()) {
-				
-			}
+			$this->oauth2->retrieve_access_token_and_save_in_session();
 		}
 		var_dump($this->oauth2->api_call());
 	}

@@ -1,4 +1,4 @@
-OAUTH 2 for Codeigniter:
+OAUTH2 library for Codeigniter:
 --------------
 
 A Codeigniter library which allows users to authorize your Linkedin, Facebook, Google, Instagram or Foursquare applications using OAuth2.
@@ -37,14 +37,20 @@ Requirements:
 
 - libcurl. 
 	
-Version 1.3 - July 5 2013
+
+
+Version 1.31 - October 10 2013
 --------------
+
+- Refactored code.	
+
+Version 1.3 - July 5 2013
+---------------
 
 - Added Foursquare authorization.
-
-	
+	 	
 Version 1.2 - June 20 2013
---------------
+--------------	 
 
 - Added Instagram authorization.
 	
