@@ -36,27 +36,30 @@ class Oauth2 {
 	private $access_token;
 	private $access_token_expires_in;
 
-	private $extra_param_sites = array('linkedin', 'google', 'instagram', 'foursquare', 'stripe');
-
-	private $get_sites = array('linkedin', 'foursquare', 'facebook');
-	private $post_sites = array('google', 'instagram', 'stripe');
+	private $api_call_json_sites = array('facebook', 'google', 'instagram', 'foursquare', 'stripe', 'dropbox');
+	private $api_call_xml_sites = array('linkedin');
 	
-	private $initial_urls = array (
+	private $get_sites = array('linkedin', 'foursquare', 'facebook');
+	private $post_sites = array('google', 'instagram', 'stripe', 'dropbox');
+	
+	private $authorize_urls = array (
 			'facebook'	=>	'https://www.facebook.com/dialog/oauth/?',
 			'linkedin'	=>	'https://www.linkedin.com/uas/oauth2/authorization?',
 			'google'	=>	'https://accounts.google.com/o/oauth2/auth?',
 			'instagram'	=>	'https://api.instagram.com/oauth/authorize/?',
 			'foursquare'	=>	'https://foursquare.com/oauth2/authenticate?',
-			'stripe'	=>	'https://connect.stripe.com/oauth/authorize?'
+			'stripe'	=>	'https://connect.stripe.com/oauth/authorize?',
+			'dropbox'	=>	'https://www.dropbox.com/1/oauth2/authorize?'
 	);
 
-	private $response_urls = array (
+	private $access_token_urls = array (
 			'facebook'	=>	'https://graph.facebook.com/oauth/access_token?',
 			'linkedin'	=>	'https://www.linkedin.com/uas/oauth2/accessToken?',
 			'google'	=>	'https://accounts.google.com/o/oauth2/token?',
 			'instagram'	=>	'https://api.instagram.com/oauth/access_token?',
 			'foursquare'	=>	'https://foursquare.com/oauth2/access_token?',
-			'stripe'	=>	'https://connect.stripe.com/oauth/token?'
+			'stripe'	=>	'https://connect.stripe.com/oauth/token?',
+			'dropbox'	=>	'https://api.dropbox.com/1/oauth2/token?'
 	);
 
 	private $api_urls = array (
@@ -65,7 +68,8 @@ class Oauth2 {
 			'google'	=>	'https://www.googleapis.com/oauth2/v1/userinfo?access_token=',
 			'instagram'	=>	'https://api.instagram.com/v1/users/self/feed?access_token=',
 			'foursquare'	=>	'https://api.foursquare.com/v2/users/self/checkins?v=YYYYMMDD&oauth_token=',
-			'stripe'	=>	'https://api.stripe.com/v1/charges?access_token='
+			'stripe'	=>	'https://api.stripe.com/v1/charges?access_token=',
+			'dropbox'	=>	'https://api.dropbox.com/1/account/info?access_token='
 	);
 
 	public $ci;
@@ -87,7 +91,7 @@ class Oauth2 {
 			$this->set_site($input['site']);
 			$this->set_consumer_key($input['app_key']);
 			$this->set_consumer_secret($input['app_secret']);
-			$this->set_redirect_url($this->set_url($input['redirect_url']));
+			$this->set_redirect_url($this->normalize_url($input['redirect_url']));
 			$this->set_scope($input['scope']);			
 		}
 
@@ -105,15 +109,11 @@ class Oauth2 {
 	}
 
 	public function get_request_base_url($site) {
-		return $this->initial_urls[$site];
+		return $this->authorize_urls[$site];
 	}
 
 	public function get_request_parameters($site, $state) {
 		$query_params = $this->get_request_query_params($state);
-
-		if (in_array($site, $this->extra_param_sites)) {
-			$query_params['response_type'] = 'code';
-		}
 		return http_build_query($query_params);
 	}
 
@@ -127,12 +127,12 @@ class Oauth2 {
 	
 	public function get_request_query_params($state) {
 		return array_merge($this->get_basic_query_params(), array ('scope' => $this->get_scope(),
-				'state' => $state));
+				'state' => $state, 'response_type' => 'code'));
 	}
 
 	public function get_access_token_query_params() {
 		return array_merge($this->get_basic_query_params(), array('code' => $this->ci->input->get('code'),
-				'client_secret' => $this->get_consumer_secret()
+				'client_secret' => $this->get_consumer_secret(), 'grant_type' => 'authorization_code'
 		));
 	}
 
@@ -168,16 +168,11 @@ class Oauth2 {
 	}
 
 	private function get_access_token_base_url($site) {
-		return $this->response_urls[$site];
+		return $this->access_token_urls[$site];
 	}
 
 	private function get_access_token_parameters($site) {
 		$query_params = $this->get_access_token_query_params();
-
-		if (in_array($site, $this->extra_param_sites)) {
-			$query_params['grant_type'] = 'authorization_code';
-		}
-
 		return http_build_query($query_params);
 	}
 
@@ -286,15 +281,11 @@ class Oauth2 {
 
 		$this->prepare_api_url($this->get_site());
 
-		$xml_sites = array('linkedin');
-
-		if (in_array($this->get_site(), $xml_sites)) {
+		if (in_array($this->get_site(), $this->api_call_xml_sites)) {
 			return $this->get_xml_api_call($this->get_site(), $this->get_access_token());
 		}
 
-		$json_sites = array('facebook', 'google', 'instagram', 'foursquare');
-
-		if (in_array($this->get_site(), $json_sites)) {
+		if (in_array($this->get_site(), $this->api_call_json_sites)) {
 			return $this->get_json_api_call($this->get_site(), $this->get_access_token());
 		}
 	}
@@ -318,7 +309,7 @@ class Oauth2 {
 	 * Normalizes the URL. Turns a relative URL into an absolute one.
 	 * @param string $url
 	 */
-	public function set_url($url) {
+	public function normalize_url($url) {
 		if (!preg_match("~^(?:f|ht)tps?://~i", $url)) {
 			return site_url($url);
 		}
@@ -396,4 +387,24 @@ class Oauth2 {
 	public function get_post_sites() {
 		return $this->post_sites;
 	}
+	
+	public function get_api_call_json_sites()
+	{
+		return $this->api_call_json_sites;
+	}
+	
+	public function set_api_call_json_sites($api_call_json_sites)
+	{
+		$this->api_call_json_sites = $api_call_json_sites;
+	}
+	
+	public function get_api_call_xml_sites()
+	{
+		return $this->api_call_xml_sites;
+	}
+	
+	public function set_api_call_xml_sites($api_call_xml_sites)
+	{
+		$this->api_call_xml_sites = $api_call_xml_sites;
+	}	
 }
