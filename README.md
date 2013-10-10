@@ -1,7 +1,7 @@
 OAUTH2 library for Codeigniter:
 --------------
 
-A Codeigniter library which allows users to authorize your Linkedin, Facebook, Google, Instagram, Foursquare or Stripe applications using OAuth2.
+A Codeigniter library which allows users to authorize your Linkedin, Facebook, Google, Instagram, Foursquare, Stripe or Dropbox applications using OAuth2.
 
 
 Usage example:
@@ -42,7 +42,7 @@ Requirements:
 Version 1.4 - October 10 2013
 --------------
 
-- Added Stripe authorization.
+- Added Stripe and Dropbox authorization.
 - Refactored code.	
 
 Version 1.3 - July 5 2013
