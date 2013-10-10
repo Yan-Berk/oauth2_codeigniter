@@ -36,17 +36,18 @@ class Oauth2 {
 	private $access_token;
 	private $access_token_expires_in;
 
-	private $extra_param_sites = array('linkedin', 'google', 'instagram', 'foursquare');
+	private $extra_param_sites = array('linkedin', 'google', 'instagram', 'foursquare', 'stripe');
 
 	private $get_sites = array('linkedin', 'foursquare', 'facebook');
-	private $post_sites = array('google', 'instagram');
+	private $post_sites = array('google', 'instagram', 'stripe');
 	
 	private $initial_urls = array (
 			'facebook'	=>	'https://www.facebook.com/dialog/oauth/?',
 			'linkedin'	=>	'https://www.linkedin.com/uas/oauth2/authorization?',
 			'google'	=>	'https://accounts.google.com/o/oauth2/auth?',
 			'instagram'	=>	'https://api.instagram.com/oauth/authorize/?',
-			'foursquare'	=>	'https://foursquare.com/oauth2/authenticate?'
+			'foursquare'	=>	'https://foursquare.com/oauth2/authenticate?',
+			'stripe'	=>	'https://connect.stripe.com/oauth/authorize?'
 	);
 
 	private $response_urls = array (
@@ -54,7 +55,8 @@ class Oauth2 {
 			'linkedin'	=>	'https://www.linkedin.com/uas/oauth2/accessToken?',
 			'google'	=>	'https://accounts.google.com/o/oauth2/token?',
 			'instagram'	=>	'https://api.instagram.com/oauth/access_token?',
-			'foursquare'	=>	'https://foursquare.com/oauth2/access_token?'
+			'foursquare'	=>	'https://foursquare.com/oauth2/access_token?',
+			'stripe'	=>	'https://connect.stripe.com/oauth/token?'
 	);
 
 	private $api_urls = array (
@@ -62,7 +64,8 @@ class Oauth2 {
 			'linkedin'	=>	'https://api.linkedin.com/v1/people/~?oauth2_access_token=',
 			'google'	=>	'https://www.googleapis.com/oauth2/v1/userinfo?access_token=',
 			'instagram'	=>	'https://api.instagram.com/v1/users/self/feed?access_token=',
-			'foursquare'	=>	'https://api.foursquare.com/v2/users/self/checkins?v=YYYYMMDD&oauth_token='
+			'foursquare'	=>	'https://api.foursquare.com/v2/users/self/checkins?v=YYYYMMDD&oauth_token=',
+			'stripe'	=>	'https://api.stripe.com/v1/charges?access_token='
 	);
 
 	public $ci;
