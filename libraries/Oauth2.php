@@ -42,6 +42,10 @@ class Oauth2 {
 	private $get_sites = array('linkedin', 'foursquare', 'facebook');
 	private $post_sites = array('google', 'instagram', 'stripe', 'dropbox');
 	
+	private $non_json_encoded_access_token_sites = array('facebook');
+	
+	private $api_call_prepared_sites = array('foursquare');
+	
 	private $authorize_urls = array (
 			'facebook'	=>	'https://www.facebook.com/dialog/oauth/?',
 			'linkedin'	=>	'https://www.linkedin.com/uas/oauth2/authorization?',
@@ -104,7 +108,7 @@ class Oauth2 {
 		$state = $this->create_random_state();
 		$this->save_state_in_session($this->get_site(), $state);
 		$request_url = $this->get_request_base_url($this->get_site());
-		$request_url .= $this->get_request_parameters($this->get_site(), $state);
+		$request_url .= $this->get_request_parameters($state, $this->get_scope());
 		return $request_url;
 	}
 
@@ -112,8 +116,8 @@ class Oauth2 {
 		return $this->authorize_urls[$site];
 	}
 
-	public function get_request_parameters($site, $state) {
-		$query_params = $this->get_request_query_params($state);
+	public function get_request_parameters($state, $scope) {
+		$query_params = $this->get_request_query_params($state, $scope);
 		return http_build_query($query_params);
 	}
 
@@ -125,14 +129,14 @@ class Oauth2 {
 		return substr(md5(rand()), 0, 8);
 	}
 	
-	public function get_request_query_params($state) {
-		return array_merge($this->get_basic_query_params(), array ('scope' => $this->get_scope(),
+	public function get_request_query_params($state, $scope) {
+		return array_merge($this->get_basic_query_params(), array ('scope' => $scope,
 				'state' => $state, 'response_type' => 'code'));
 	}
 
-	public function get_access_token_query_params() {
-		return array_merge($this->get_basic_query_params(), array('code' => $this->ci->input->get('code'),
-				'client_secret' => $this->get_consumer_secret(), 'grant_type' => 'authorization_code'
+	public function get_access_token_query_params($code, $consumer_secret) {
+		return array_merge($this->get_basic_query_params(), array('code' => $code,
+				'client_secret' => $consumer_secret, 'grant_type' => 'authorization_code'
 		));
 	}
 
@@ -147,7 +151,7 @@ class Oauth2 {
 			return false;
 		}
 
-		return $this->get_access_token_and_save_in_session($this->get_site());
+		return $this->get_access_token_and_save_in_session($this->get_site(), $this->ci->input->get('code'), $this->get_consumer_secret());
 	}
 
 	public function is_response_valid($get, $state) {
@@ -161,9 +165,9 @@ class Oauth2 {
 		return false;
 	}
 
-	private function build_access_token_retrieve_url($site) {
+	private function build_access_token_retrieve_url($site, $code, $consumer_secret) {
 		$request_url = $this->get_access_token_base_url($site);
-		$request_url .= $this->get_access_token_parameters($site);
+		$request_url .= $this->get_access_token_parameters($code, $consumer_secret);
 		return $request_url;
 	}
 
@@ -171,36 +175,38 @@ class Oauth2 {
 		return $this->access_token_urls[$site];
 	}
 
-	private function get_access_token_parameters($site) {
-		$query_params = $this->get_access_token_query_params();
+	private function get_access_token_parameters($code, $consumer_secret) {
+		$query_params = $this->get_access_token_query_params($code, $consumer_secret);
 		return http_build_query($query_params);
 	}
 
-	private function get_access_token_and_save_in_session($site) {
-		$result = $this->get_access_token_by_site($site);
+	private function get_access_token_and_save_in_session($site, $code, $consumer_secret) {
+		$result = $this->get_access_token_by_site($site, $code, $consumer_secret);
 		$this->save_access_token_in_session($site, $result['access_token'], $result['expires_in']);
 		return true;
 	}
 	
-	public function get_access_token_by_site($site) {
+	public function get_access_token_by_site($site, $code, $consumer_secret) {
 		if (in_array($site, $this->get_get_sites())) {
-			$result = $this->get_access_token_by_get_request($site);
+			$result = $this->get_access_token_by_get_request($site, $code, $consumer_secret);
 		}
 		else if (in_array($site, $this->get_post_sites())) {
-			$result = $this->get_access_token_by_post_request($site);
+			$result = $this->get_access_token_by_post_request($site, $code, $consumer_secret);
 		}
 		return $this->get_access_token_data($result);
 	}
 
-	public function get_access_token_by_get_request($site) {
-		if ($site == 'facebook') {
-			return $this->get_access_token_by_get_request_connection($site);
+	public function get_access_token_by_get_request($site, $code, $consumer_secret) {
+		$result = $this->get_access_token_by_get_request_connection($site, $code, $consumer_secret);
+		
+		if (in_array($site, $this->get_non_json_encoded_access_token_sites())) {
+			return $result;
 		}
-		return json_decode($this->get_access_token_by_get_request_connection($site));
+		return json_decode($result);
 	}
 	
-	public function get_access_token_by_post_request($site) {
-		return json_decode($this->get_access_token_by_post_request_connection($site));		
+	public function get_access_token_by_post_request($site, $code, $consumer_secret) {
+		return json_decode($this->get_access_token_by_post_request_connection($site, $code, $consumer_secret));		
 	}	
 
 	public function get_access_token_data($result) {
@@ -246,12 +252,12 @@ class Oauth2 {
 		$this->ci->session->set_userdata($site.'_oauth2_access_token_expires_in', $expires_in);
 	}
 
-	private function get_access_token_by_get_request_connection($site) {
-		return file_get_contents($this->build_access_token_retrieve_url($site));
+	private function get_access_token_by_get_request_connection($site, $code, $consumer_secret) {
+		return file_get_contents($this->build_access_token_retrieve_url($site, $code, $consumer_secret));
 	}
 
-	private function get_access_token_by_post_request_connection($site) {
-		return $this->run_curl($this->get_access_token_base_url($site), 'POST', $this->get_access_token_parameters($site));
+	private function get_access_token_by_post_request_connection($site, $code, $consumer_secret) {
+		return $this->run_curl($this->get_access_token_base_url($site), 'POST', $this->get_access_token_parameters($code, $consumer_secret));
 	}
 
 	private function set_access_token_data($access_token, $expires_in) {
@@ -291,7 +297,7 @@ class Oauth2 {
 	}
 
 	private function prepare_api_url($site) {
-		if ($site == 'foursquare') {
+		if (in_array($site, $this->get_api_call_prepared_sites())) {
 			$this->api_urls[$site] = str_replace('v=YYYYMMDD', 'v='.date('Ymd'), $this->api_urls[$site]);
 		}
 	}
@@ -407,4 +413,24 @@ class Oauth2 {
 	{
 		$this->api_call_xml_sites = $api_call_xml_sites;
 	}	
+
+	public function get_non_json_encoded_access_token_sites()
+	{
+	    return $this->non_json_encoded_access_token_sites;
+	}
+
+	public function set_non_json_encoded_access_token_sites($non_json_encoded_access_token_sites)
+	{
+	    $this->non_json_encoded_access_token_sites = $non_json_encoded_access_token_sites;
+	}
+
+	public function get_api_call_prepared_sites()
+	{
+	    return $this->api_call_prepared_sites;
+	}
+
+	public function set_api_call_prepared_sites($api_call_prepared_sites)
+	{
+	    $this->api_call_prepared_sites = $api_call_prepared_sites;
+	}
 }
