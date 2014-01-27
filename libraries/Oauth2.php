@@ -40,7 +40,7 @@ class Oauth2 {
 	private $api_call_xml_sites = array('linkedin');
 	
 	private $get_sites = array('linkedin', 'foursquare', 'facebook');
-	private $post_sites = array('google', 'instagram', 'stripe', 'dropbox');
+	private $post_sites = array('google', 'instagram', 'stripe', 'dropbox', 'box');
 	
 	private $non_json_encoded_access_token_sites = array('facebook');
 	
@@ -53,7 +53,8 @@ class Oauth2 {
 			'instagram'	=>	'https://api.instagram.com/oauth/authorize/?',
 			'foursquare'	=>	'https://foursquare.com/oauth2/authenticate?',
 			'stripe'	=>	'https://connect.stripe.com/oauth/authorize?',
-			'dropbox'	=>	'https://www.dropbox.com/1/oauth2/authorize?'
+			'dropbox'	=>	'https://www.dropbox.com/1/oauth2/authorize?',
+			'box'		=>	'https://www.box.com/api/oauth2/authorize?'
 	);
 
 	private $access_token_urls = array (
@@ -63,7 +64,8 @@ class Oauth2 {
 			'instagram'	=>	'https://api.instagram.com/oauth/access_token?',
 			'foursquare'	=>	'https://foursquare.com/oauth2/access_token?',
 			'stripe'	=>	'https://connect.stripe.com/oauth/token?',
-			'dropbox'	=>	'https://api.dropbox.com/1/oauth2/token?'
+			'dropbox'	=>	'https://api.dropbox.com/1/oauth2/token?',
+			'box'		=> 'https://www.box.com/api/oauth2/token?'
 	);
 
 	private $api_urls = array (
@@ -73,7 +75,8 @@ class Oauth2 {
 			'instagram'	=>	'https://api.instagram.com/v1/users/self/feed?access_token=',
 			'foursquare'	=>	'https://api.foursquare.com/v2/users/self/checkins?v=YYYYMMDD&oauth_token=',
 			'stripe'	=>	'https://api.stripe.com/v1/charges?access_token=',
-			'dropbox'	=>	'https://api.dropbox.com/1/account/info?access_token='
+			'dropbox'	=>	'https://api.dropbox.com/1/account/info?access_token=',
+			'box'		=>	'https://www.box.com/api/2.0/folders/0?access_token='
 	);
 
 	public $ci;
@@ -148,7 +151,7 @@ class Oauth2 {
 	
 	public function retrieve_access_token_and_save_in_session() {
 		if (!$this->is_response_valid($this->ci->input->get(), $this->get_state())) {
-			return false;
+			return FALSE;
 		}
 
 		return $this->get_access_token_and_save_in_session($this->get_site(), $this->ci->input->get('code'), $this->get_consumer_secret());
@@ -156,13 +159,10 @@ class Oauth2 {
 
 	public function is_response_valid($get, $state) {
 		if (isset($get['state']) && $get['state'] == $state && isset($get['code'])) {
-			return true;
+			return TRUE;
 		}
-		if (isset($get['error'])) {
-			//Handle error
-			//$get['error_description'];
-		}
-		return false;
+		
+		return FALSE;
 	}
 
 	private function build_access_token_retrieve_url($site, $code, $consumer_secret) {
@@ -183,7 +183,7 @@ class Oauth2 {
 	private function get_access_token_and_save_in_session($site, $code, $consumer_secret) {
 		$result = $this->get_access_token_by_site($site, $code, $consumer_secret);
 		$this->save_access_token_in_session($site, $result['access_token'], $result['expires_in']);
-		return true;
+		return TRUE;
 	}
 	
 	public function get_access_token_by_site($site, $code, $consumer_secret) {
@@ -231,7 +231,7 @@ class Oauth2 {
 
 			return array('access_token' => $params['access_token'], 'expires_in' => $expires_in);
 		}
-		return false;		
+		return FALSE;		
 	}
 	
 	private function convert_object_to_array($obj) {
