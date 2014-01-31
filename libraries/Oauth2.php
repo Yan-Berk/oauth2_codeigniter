@@ -108,38 +108,38 @@ class Oauth2 {
 	}
 
 	public function build_initial_request_url_and_create_state() {
-		$state = $this->create_random_state();
-		$this->save_state_in_session($this->get_site(), $state);
-		$request_url = $this->get_request_base_url($this->get_site());
-		$request_url .= $this->get_request_parameters($state, $this->get_scope());
+		$this->set_state($this->create_random_state());
+		$this->save_state_in_session();
+		$request_url = $this->get_request_base_url();
+		$request_url .= $this->get_request_parameters();
 		return $request_url;
 	}
 
-	public function get_request_base_url($site) {
-		return $this->authorize_urls[$site];
+	public function get_request_base_url() {
+		return $this->authorize_urls[$this->get_site()];
 	}
 
-	public function get_request_parameters($state, $scope) {
-		$query_params = $this->get_request_query_params($state, $scope);
+	public function get_request_parameters() {
+		$query_params = $this->get_request_query_params();
 		return http_build_query($query_params);
 	}
 
-	public function save_state_in_session($site, $state) {
-		$this->ci->session->set_userdata($site.'_oauth2_state', $state);
+	public function save_state_in_session() {
+		$this->ci->session->set_userdata($this->get_site().'_oauth2_state', $this->get_state());
 	}
 	
 	public function create_random_state() {
 		return substr(md5(rand()), 0, 8);
 	}
 	
-	public function get_request_query_params($state, $scope) {
-		return array_merge($this->get_basic_query_params(), array ('scope' => $scope,
-				'state' => $state, 'response_type' => 'code'));
+	public function get_request_query_params($state) {
+		return array_merge($this->get_basic_query_params(), array ('scope' => $this->get_scope(),
+				'state' => $this->get_state(), 'response_type' => 'code'));
 	}
 
-	public function get_access_token_query_params($code, $consumer_secret) {
+	public function get_access_token_query_params($code) {
 		return array_merge($this->get_basic_query_params(), array('code' => $code,
-				'client_secret' => $consumer_secret, 'grant_type' => 'authorization_code'
+				'client_secret' => $this->get_consumer_secret(), 'grant_type' => 'authorization_code'
 		));
 	}
 
@@ -150,63 +150,63 @@ class Oauth2 {
 	}
 	
 	public function retrieve_access_token_and_save_in_session() {
-		if (!$this->is_response_valid($this->ci->input->get(), $this->get_state())) {
+		if (!$this->is_response_valid($this->ci->input->get())) {
 			return FALSE;
 		}
 
-		return $this->get_access_token_and_save_in_session($this->get_site(), $this->ci->input->get('code'), $this->get_consumer_secret());
+		return $this->get_access_token_and_save_in_session($this->ci->input->get('code'));
 	}
 
-	public function is_response_valid($get, $state) {
-		if (isset($get['state']) && $get['state'] == $state && isset($get['code'])) {
+	public function is_response_valid($get) {
+		if (isset($get['state']) && $get['state'] == $this->get_state() && isset($get['code'])) {
 			return TRUE;
 		}
 		
 		return FALSE;
 	}
 
-	private function build_access_token_retrieve_url($site, $code, $consumer_secret) {
-		$request_url = $this->get_access_token_base_url($site);
-		$request_url .= $this->get_access_token_parameters($code, $consumer_secret);
+	private function build_access_token_retrieve_url($code) {
+		$request_url = $this->get_access_token_base_url();
+		$request_url .= $this->get_access_token_parameters($code);
 		return $request_url;
 	}
 
-	private function get_access_token_base_url($site) {
-		return $this->access_token_urls[$site];
+	private function get_access_token_base_url() {
+		return $this->access_token_urls[$this->get_site()];
 	}
 
-	private function get_access_token_parameters($code, $consumer_secret) {
-		$query_params = $this->get_access_token_query_params($code, $consumer_secret);
+	private function get_access_token_parameters($code) {
+		$query_params = $this->get_access_token_query_params($code);
 		return http_build_query($query_params);
 	}
 
-	private function get_access_token_and_save_in_session($site, $code, $consumer_secret) {
-		$result = $this->get_access_token_by_site($site, $code, $consumer_secret);
-		$this->save_access_token_in_session($site, $result['access_token'], $result['expires_in']);
+	private function get_access_token_and_save_in_session($code) {
+		$result = $this->get_access_token_by_site($code);
+		$this->save_access_token_in_session($result['access_token'], $result['expires_in']);
 		return TRUE;
 	}
 	
-	public function get_access_token_by_site($site, $code, $consumer_secret) {
-		if (in_array($site, $this->get_get_sites())) {
-			$result = $this->get_access_token_by_get_request($site, $code, $consumer_secret);
+	public function get_access_token_by_site($code) {
+		if (in_array($this->get_site(), $this->get_get_sites())) {
+			$result = $this->get_access_token_by_get_request($code);
 		}
-		else if (in_array($site, $this->get_post_sites())) {
-			$result = $this->get_access_token_by_post_request($site, $code, $consumer_secret);
+		else if (in_array($this->get_site(), $this->get_post_sites())) {
+			$result = $this->get_access_token_by_post_request($code);
 		}
 		return $this->get_access_token_data($result);
 	}
 
-	public function get_access_token_by_get_request($site, $code, $consumer_secret) {
-		$result = $this->get_access_token_by_get_request_connection($site, $code, $consumer_secret);
+	public function get_access_token_by_get_request($code) {
+		$result = $this->get_access_token_by_get_request_connection($code);
 		
-		if (in_array($site, $this->get_non_json_encoded_access_token_sites())) {
+		if (in_array($this->get_site(), $this->get_non_json_encoded_access_token_sites())) {
 			return $result;
 		}
 		return json_decode($result);
 	}
 	
-	public function get_access_token_by_post_request($site, $code, $consumer_secret) {
-		return json_decode($this->get_access_token_by_post_request_connection($site, $code, $consumer_secret));		
+	public function get_access_token_by_post_request($code) {
+		return json_decode($this->get_access_token_by_post_request_connection($code));		
 	}	
 
 	public function get_access_token_data($result) {
@@ -231,7 +231,7 @@ class Oauth2 {
 
 			return array('access_token' => $params['access_token'], 'expires_in' => $expires_in);
 		}
-		return FALSE;		
+		return FALSE;
 	}
 	
 	private function convert_object_to_array($obj) {
@@ -243,21 +243,21 @@ class Oauth2 {
 		$expires_in = NULL;
 		if (isset($obj->expires_in)) {
 			$expires_in = $obj->expires_in;
-		}		
+		}
 		return array('access_token' => $access_token, 'expires_in' => $expires_in);
 	}
 
-	private function save_access_token_in_session($site, $access_token, $expires_in) {
-		$this->ci->session->set_userdata($site.'_oauth2_access_token', $access_token);
-		$this->ci->session->set_userdata($site.'_oauth2_access_token_expires_in', $expires_in);
+	private function save_access_token_in_session($access_token, $expires_in) {
+		$this->ci->session->set_userdata($this->get_site().'_oauth2_access_token', $access_token);
+		$this->ci->session->set_userdata($this->get_site().'_oauth2_access_token_expires_in', $expires_in);
 	}
 
-	private function get_access_token_by_get_request_connection($site, $code, $consumer_secret) {
-		return file_get_contents($this->build_access_token_retrieve_url($site, $code, $consumer_secret));
+	private function get_access_token_by_get_request_connection($code) {
+		return file_get_contents($this->build_access_token_retrieve_url($code));
 	}
 
-	private function get_access_token_by_post_request_connection($site, $code, $consumer_secret) {
-		return $this->run_curl($this->get_access_token_base_url($site), 'POST', $this->get_access_token_parameters($code, $consumer_secret));
+	private function get_access_token_by_post_request_connection($code) {
+		return $this->run_curl($this->get_access_token_base_url(), 'POST', $this->get_access_token_parameters($code));
 	}
 
 	private function set_access_token_data($access_token, $expires_in) {
@@ -285,30 +285,30 @@ class Oauth2 {
 	 */
 	public function api_call() {
 
-		$this->prepare_api_url($this->get_site());
+		$this->prepare_api_url();
 
 		if (in_array($this->get_site(), $this->api_call_xml_sites)) {
-			return $this->get_xml_api_call($this->get_site(), $this->get_access_token());
+			return $this->get_xml_api_call($this->get_access_token());
 		}
 
 		if (in_array($this->get_site(), $this->api_call_json_sites)) {
-			return $this->get_json_api_call($this->get_site(), $this->get_access_token());
+			return $this->get_json_api_call();
 		}
 	}
 
-	private function prepare_api_url($site) {
-		if (in_array($site, $this->get_api_call_prepared_sites())) {
-			$this->api_urls[$site] = str_replace('v=YYYYMMDD', 'v='.date('Ymd'), $this->api_urls[$site]);
+	private function prepare_api_url() {
+		if (in_array($this->get_site(), $this->get_api_call_prepared_sites())) {
+			$this->api_urls[$this->get_site()] = str_replace('v=YYYYMMDD', 'v='.date('Ymd'), $this->api_urls[$this->get_site()]);
 		}
 	}
 	
-	private function get_xml_api_call($site, $access_token) {
-		$results_xml = file_get_contents($this->api_urls[$site].$access_token);
+	private function get_xml_api_call() {
+		$results_xml = file_get_contents($this->api_urls[$this->get_site()].$this->get_access_token());
 		return new SimpleXMLElement($results_xml);
 	}
 
-	private function get_json_api_call($site, $access_token) {
-		return json_decode(file_get_contents($this->api_urls[$site].$access_token));
+	private function get_json_api_call() {
+		return json_decode(file_get_contents($this->api_urls[$this->get_site()].$this->get_access_token()));
 	}
 	
 	/**
